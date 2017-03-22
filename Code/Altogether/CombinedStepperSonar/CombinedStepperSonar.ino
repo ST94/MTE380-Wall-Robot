@@ -1,14 +1,47 @@
 #include <NewPing.h>
 #include <AFMotor.h>
 
-
-#define TRIGGER_PIN  29  // Arduino pin tied to trigger pin on the ultrasonic sensor.
-#define ECHO_PIN     23  // Arduino pin tied to echo pin on the ultrasonic sensor.
+//200 steps = 1 rotation -> 20 cm
+#define SONAR_NUM 3      
+#define TRIGGER_1  31  // Arduino pin tied to trigger pin on the ultrasonic sensor.
+#define ECHO_1     47  // Arduino pin tied to echo pin on the ultrasonic sensor.
 #define MAX_DISTANCE 400 // Maximum distance we want to ping for (in centimeters). Maximum sensor distance is rated at 400-500cm.
-#define GREEN_LED 47
-#define RED_LED 45
+#define FRONT_MAGNET 37
+#define BACK_MAGNET 41
+
+//sensor 2
+#define TRIGGER_2 29
+#define ECHO_2 53 
+
+#define TRIGGER_3 26
+#define ECHO_3 28
+
+NewPing sonar[SONAR_NUM] = {   // Sensor object array.
+  NewPing(TRIGGER_1, ECHO_1, MAX_DISTANCE), // Each sensor's trigger pin, echo pin, and max distance to ping. 
+  NewPing(TRIGGER_2, ECHO_2, MAX_DISTANCE), 
+  NewPing(TRIGGER_3, ECHO_3, MAX_DISTANCE)
+};
+
+
 AF_Stepper motor1(200, 1);//param 1 for M1 & M2
 AF_Stepper motor2(200, 2);//param 2 for M3 & M4
+
+
+int distance = 0;
+int distance2 = 0;
+int distance3 = 0;
+
+bool distanceWithinTolerances (int distanceA, int distanceB, int lowerBound, int upperBound){
+  int distanceDifference = distanceA - distanceB;
+  Serial.print(distanceA);
+  Serial.print(" ");
+  Serial.println(distanceB);
+    
+  if (abs(distanceDifference) >= lowerBound && abs(distanceDifference) <= upperBound){
+    return true;
+  }
+  return false;
+}
 
 void doubleStep (int step, int direction, int style) {
   motor1.setSpeed(250);  // 5000 = 1000 rpm   
@@ -36,38 +69,169 @@ void turnLeft (int step, int style) {
   }
 }
 
-
-NewPing sonar(TRIGGER_PIN, ECHO_PIN, MAX_DISTANCE); // NewPing setup of pins and maximum distance.
-int distance;
 void setup() {
-  int distance = 0;
+  
   Serial.begin(115200); // Open serial monitor at 115200 baud to see ping results.
-  pinMode(RED_LED, OUTPUT);  //Assume that the red and green LEDS are the electromagnets to simulate behaviour
-  pinMode(GREEN_LED, OUTPUT);
+  pinMode(FRONT_MAGNET, OUTPUT);  //Assume that the red and green LEDS are the electromagnets to simulate behaviour
+  pinMode(BACK_MAGNET, OUTPUT);
   motor1.setSpeed(250);  // 5000 = 1000 rpm   
   motor2.setSpeed(250);  // 1000 rpm  
-
-  //motor1.step(100, FORWARD, SINGLE); 
-  //motor2.step(100, FORWARD, SINGLE); 
   motor1.release();
   motor2.release();
   delay(1000);
 }
 
+void findAndOrientWall (){
+  //check for change in sensor distance
+  int distanceToWall = 0;
+  int newDistance = 0;
+  int newDistanceCounter = 0;
+  int sensorDistance = 0;
+
+  bool isFacingWall = false;
+  bool foundWall = false;
+  bool wallDetected = false;
+
+  delay(5000);
+
+   //detect distance to wall
+   Serial.println("THERE");
+  while (distanceToWall == 0){
+    Serial.println("HERE");
+        while (sonar[0].ping_cm() < 100) { 
+          doubleStep(25, BACKWARD, SINGLE);
+             Serial.println(sonar[0].ping_cm());
+             doubleStep(25, BACKWARD, SINGLE);
+        }
+        distanceToWall = sonar[0].ping_cm();
+        Serial.println("output initial distance: " + distanceToWall);
+  }
+      
+  //detect wall
+  while(!isFacingWall){
+    if (!foundWall){
+      doubleStep(25, BACKWARD, SINGLE);
+      //delay(250);
+      sensorDistance = sonar[0].ping_cm();
+      
+      wallDetected = (distanceWithinTolerances (distanceToWall, sensorDistance, 20, 30));
+      
+      //check if approaching metal wall
+      int frontSensor = sonar[1].ping_cm();
+//      if (frontSensor < 30){
+//        isFacingWall = true;
+//        foundWall = true;
+//        distanceToWall = frontSensor;
+//        Serial.println("going forward");
+//        break;
+//      } else 
+      if (wallDetected){
+          Serial.println("True");
+          newDistanceCounter++;
+          if (newDistanceCounter > 4){
+            foundWall = true;
+            sensorDistance = distanceToWall;
+          }   
+      } else if (!wallDetected) {
+          newDistanceCounter --;
+          Serial.println("False");
+          if (newDistanceCounter < -3){
+            newDistanceCounter = 0;
+            distanceToWall = sensorDistance;
+            Serial.println(distanceToWall);
+            //Serial.println("reset Distance to Wall: " + distanceToWall);
+          }
+      }
+    } else {
+      Serial.println("TURNING");
+     turnLeft (25, SINGLE);
+      //delay(250);
+      //Serial.println(sonar[2].ping_cm());
+      int distance2 = sonar[2].ping_cm();
+      if (distanceWithinTolerances (distanceToWall, distance2, 0, 10)) {
+        isFacingWall = true;
+        Serial.println("FINISHED");
+      } 
+    }
+  }
+}
+
+void findAndOrientDropSite (){
+  //check for change in sensor distance
+  int distanceToSite = 0;
+  int newDistance = 0;
+  int newDistanceCounter = 0;
+  int sensorDistance = 0;
+
+  int holdCounter = 0;
+
+  bool isFacingSite = false;
+  bool foundSite = false;
+
+  delay(5000);
+
+  //detect dropsite
+  while(!isFacingSite){
+    if (!foundSite){
+      doubleStep(10, FORWARD, SINGLE);
+      sensorDistance = sonar[0].ping_cm();
+      if (distanceToSite == 0){
+        while (sonar[0].ping_cm() == 0){};
+        distanceToSite = sonar[0].ping_cm();
+      } else if (!distanceWithinTolerances (distanceToSite, sensorDistance, 10, 20)){
+          doubleStep(25, FORWARD, SINGLE);
+          while  (holdCounter < 5){
+            delay(100);
+            holdCounter++;
+            
+            if (distanceWithinTolerances (sonar[0].ping_cm(), sensorDistance, 10, 20)){
+              newDistanceCounter ++;
+            }
+          }
+          if (newDistanceCounter > 4){
+            foundSite = true;
+            sensorDistance = distanceToSite;
+          }
+          else {
+            newDistanceCounter = 0;
+            distanceToSite = sensorDistance;
+        }   
+      }
+    } else {
+      turnLeft (25, SINGLE);
+      if (distanceWithinTolerances (distanceToSite, sonar[1].ping_cm(), 0, 10)) {
+        isFacingSite = true;
+      } 
+    }
+  }
+}
+
 void loop() {
-  //delay(250);  //let this delay be the delay between sensor readings
+  //Start
+  int sensorCounter = 0;
   
-  distance = sonar.ping_cm();
-  Serial.println(distance); // Send ping, get distance in cm and print result (0 = outside set distance range)
-  if (distance>10 || distance<5){
-    digitalWrite(RED_LED, HIGH);
-    digitalWrite(GREEN_LED, LOW);
-    //doubleStep(100, BACKWARD, DOUBLE);
-  }
-  else if (5 < distance && distance < 10){
-    digitalWrite(GREEN_LED, HIGH);
-    digitalWrite(RED_LED, LOW);
-    //doubleStep(0, BRAKE, DOUBLE);
-    turnLeft(100, SINGLE);
-  }
+//  for (uint8_t i = 0; i < SONAR_NUM; i++) { // Loop through each sensor and display results.
+//    //delay(50); // Wait 50ms between pings (about 20 pings/sec). 29ms should be the shortest delay between pings.
+//  }
+
+
+  findAndOrientWall();
+  delay(20000);
+
+
+//  if (distance>10 || distance<5){
+//    digitalWrite(FRONT_MAGNET, HIGH);
+//    digitalWrite(BACK_MAGNET, HIGH);
+//    doubleStep(200, FORWARD, SINGLE);
+//    Serial.println("first if statement");
+//    
+//    //doubleStep(100, BACKWARD, DOUBLE);
+//  }
+//  else if (5 < distance && distance < 10){
+//    digitalWrite(FRONT_MAGNET, LOW);
+//    digitalWrite(BACK_MAGNET, LOW);
+//    //doubleStep(0, BRAKE, DOUBLE);
+//    Serial.println("second if statement");
+//    turnLeft(100, SINGLE);
+//  }
 }
