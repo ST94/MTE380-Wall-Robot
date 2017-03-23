@@ -3,18 +3,23 @@
 
 //200 steps = 1 rotation -> 20 cm
 #define SONAR_NUM 3      
-#define TRIGGER_1  31  // Arduino pin tied to trigger pin on the ultrasonic sensor.
-#define ECHO_1     47  // Arduino pin tied to echo pin on the ultrasonic sensor.
 #define MAX_DISTANCE 400 // Maximum distance we want to ping for (in centimeters). Maximum sensor distance is rated at 400-500cm.
 #define FRONT_MAGNET 37
 #define BACK_MAGNET 41
 
-//sensor 2
-#define TRIGGER_2 29
-#define ECHO_2 53 
 
-#define TRIGGER_3 26
-#define ECHO_3 28
+//Sensors - Yellow Wire = Trigger, Green Wire - Echo
+//sensor 1 left - black and blue
+#define TRIGGER_1 41
+#define ECHO_1 40
+
+//sensor 2 right - black tape
+#define TRIGGER_2 31
+#define ECHO_2 30
+
+//sensor 3 front - blue tape
+#define TRIGGER_3  37  // Arduino pin tied to trigger pin on the ultrasonic sensor.
+#define ECHO_3     36  // Arduino pin tied to echo pin on the ultrasonic sensor.
 
 #define LEFT_SIDE 0
 #define RIGHT_SIDE 1
@@ -222,7 +227,7 @@ void findAndOrientDropSite (){
       for (int i = LEFT_SIDE; i < RIGHT_SIDE + 1; i++){
         sensorDistance[i] = sonar[i].ping_cm();
         if (!distanceWithinTolerances (distanceToSite[i], sensorDistance[i], 0, 20)){
-            doubleStep(25, FORWARD, SINGLE); //moves forward for each side check, but should be fine
+            doubleStep(100, FORWARD, SINGLE); //moves forward for each side check, but should be fine
             while  (holdCounter < 5){
               delay(100);
               holdCounter++;
@@ -273,6 +278,7 @@ void loop() {
 
   findAndOrientWall();
   navigateOverWall();
+  findAndOrientDropSite();
   delay(20000);
 
 
