@@ -199,10 +199,15 @@ void navigateOverWall(){
 void findAndOrientDropSite (){
   //assumes sensors are at position 0 and 1, should be modified if otherwise
   //check for change in sensor distance
-  int distanceToSite[] = {0, 0};
+  //sensor[0] is left
+  //sensor[1] is right
+  
+  int distanceToSite = 0;
   int newDistance = 0;
   int newDistanceCounter = 0;
   int sensorDistance[2] = {0, 0};
+  int sensorMinRange[2] = {0, 0};
+  int sensorMaxRange[2] = {125, 200};
 
   int holdCounter = 0;
 
@@ -212,58 +217,48 @@ void findAndOrientDropSite (){
 
   delay(5000);
 
-  //inititalize distances for both sensors
-
-  for (int i = LEFT_SIDE; i < RIGHT_SIDE + 1; i++){
-    while (distanceToSite[i] == 0){
-      distanceToSite[i] = sonar[i].ping_cm(); //might need to step forward here
-    }
-  }
-
   //detect dropsite
   while(!isFacingSite){
-    if (!foundSite){
-      doubleStep(10, FORWARD, SINGLE);
-      for (int i = LEFT_SIDE; i < RIGHT_SIDE + 1; i++){
+    while (!foundSite){
+      doubleStep(25, FORWARD, SINGLE);
+      for (int i = LEFT_SIDE; i <= RIGHT_SIDE ; i++){
         sensorDistance[i] = sonar[i].ping_cm();
-        if (!distanceWithinTolerances (distanceToSite[i], sensorDistance[i], 0, 20)){
-            doubleStep(100, FORWARD, SINGLE); //moves forward for each side check, but should be fine
-            while  (holdCounter < 5){
+        if (sensorDistance[i]>sensorMinRange[i] && sensorDistance[i]<sensorMaxRange[i]){
+          distanceToSite = sensorDistance[i];
+            //doubleStep(25, FORWARD, SINGLE); //moves forward for each side check, but should be fine
+            while (holdCounter < 5){
               delay(100);
               holdCounter++;
-              
-              if (distanceWithinTolerances (sonar[i].ping_cm(), sensorDistance[i], 10, 20)){
+             if (distanceWithinTolerances(sonar[i].ping_cm(), distanceToSite, 0, 5)){
                 newDistanceCounter ++;
               }
             }
-            if (newDistanceCounter > 4){
+            if (newDistanceCounter >= 4){
               foundSite = true;
-              distanceToSite[i] = sensorDistance[i];
-
               if (i == LEFT_SIDE){
                 foundSiteSide = LEFT_SIDE;
               } else {
                 foundSiteSide = RIGHT_SIDE;
               }
               break;
-           }
-           else {
+           } else {
               newDistanceCounter = 0;
               holdCounter = 0;
-              distanceToSite[i] = sensorDistance[i];
           }   
         }
       }
-    } else {
+    } 
       if ( foundSiteSide == LEFT_SIDE){
         turnLeft (25, SINGLE);
       } else if (foundSiteSide == RIGHT_SIDE){
         turnRight (25, SINGLE);
       }
-      if (distanceWithinTolerances (distanceToSite[foundSiteSide], sonar[FRONT_SIDE].ping_cm(), 0, 20)) {
+      if (distanceWithinTolerances (distanceToSite, sonar[FRONT_SIDE].ping_cm(), 0, 5)) {
         isFacingSite = true;
       } 
     }
+  while(sonar[FRONT_SIDE].ping_cm()>10){
+  doubleStep(50, FORWARD, SINGLE);
   }
 }
 
