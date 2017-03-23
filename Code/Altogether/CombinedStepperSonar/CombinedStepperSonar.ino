@@ -43,9 +43,7 @@ bool distanceWithinTolerances (int distanceA, int distanceB, int lowerBound, int
   return false;
 }
 
-void doubleStep (int step, int direction, int style) {
-  motor1.setSpeed(250);  // 5000 = 1000 rpm   
-  motor2.setSpeed(250);  // 1000 rpm  
+void doubleStep (int step, int direction, int style) { 
   while (step--) {
     motor1.step(1, direction, style); 
     motor2.step(1, direction, style); 
@@ -156,6 +154,38 @@ void findAndOrientWall (){
   }
 }
 
+void navigateOverWall(){
+  //Get close to the wall
+  while(sonar[0].ping_cm()>5 || sonar[0].ping_cm()== 0){
+    doubleStep(FORWARD, 25, SINGLE);
+  }
+  //Wall detected
+  Serial.println("WALL");
+  digitalWrite(FRONT_MAGNET, HIGH);
+  digitalWrite(BACK_MAGNET, HIGH);
+  motor1.setSpeed(60);
+  motor2.setSpeed(60);
+
+  doubleStep(FORWARD, 200, DOUBLE);
+
+  //Get close to floor
+  while(sonar[0].ping_cm()>5 || sonar[0].ping_cm()== 0){
+    doubleStep(FORWARD, 25, DOUBLE);
+  }
+
+  //Floor detected
+  Serial.println("FLOOR");
+  digitalWrite(FRONT_MAGNET, LOW);
+
+  doubleSTEP(FORWARD, 25, SINGLE)
+  
+  digitalWrite(BACK_MAGNET, LOW);
+  motor1.setSpeed(250);
+  motor2.setSpeed(250);
+
+  doubleStep(FORWARD, 50, SINGLE);
+}
+
 void findAndOrientDropSite (){
   //check for change in sensor distance
   int distanceToSite = 0;
@@ -216,6 +246,7 @@ void loop() {
 
 
   findAndOrientWall();
+  navigateOverWall()
   delay(20000);
 
 
