@@ -30,6 +30,7 @@ AF_Stepper motor2(200, 2);//param 2 for M3 & M4
 int distance = 0;
 int distance2 = 0;
 int distance3 = 0;
+int distanceFromFront = 0;
 
 bool distanceWithinTolerances (int distanceA, int distanceB, int lowerBound, int upperBound){
   int distanceDifference = distanceA - distanceB;
@@ -156,7 +157,7 @@ void findAndOrientWall (){
 
 void navigateOverWall(){
   //Get close to the wall
-  while(sonar[0].ping_cm()>5 || sonar[0].ping_cm()== 0){
+  while(sonar[0].ping_cm()>distanceFromFront || sonar[0].ping_cm()== 0){
     doubleStep(FORWARD, 25, SINGLE);
   }
   //Wall detected
@@ -169,7 +170,7 @@ void navigateOverWall(){
   doubleStep(FORWARD, 200, DOUBLE);
 
   //Get close to floor
-  while(sonar[0].ping_cm()>5 || sonar[0].ping_cm()== 0){
+  while(sonar[0].ping_cm()>distanceFromFront || sonar[0].ping_cm()== 0){
     doubleStep(FORWARD, 25, DOUBLE);
   }
 
