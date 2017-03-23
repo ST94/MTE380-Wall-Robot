@@ -16,6 +16,10 @@
 #define TRIGGER_3 26
 #define ECHO_3 28
 
+#define LEFT_SIDE 0
+#define RIGHT_SIDE 1
+#define FRONT_SIDE 2
+
 NewPing sonar[SONAR_NUM] = {   // Sensor object array.
   NewPing(TRIGGER_1, ECHO_1, MAX_DISTANCE), // Each sensor's trigger pin, echo pin, and max distance to ping. 
   NewPing(TRIGGER_2, ECHO_2, MAX_DISTANCE), 
@@ -129,7 +133,7 @@ void findAndOrientWall (){
           newDistanceCounter++;
           if (newDistanceCounter > 4){
             foundWall = true;
-            sensorDistance = distanceToWall;
+            distanceToWall = sensorDistance;
           }   
       } else if (!wallDetected) {
           newDistanceCounter --;
@@ -178,7 +182,7 @@ void navigateOverWall(){
   Serial.println("FLOOR");
   digitalWrite(FRONT_MAGNET, LOW);
 
-  doubleSTEP(FORWARD, 25, SINGLE)
+  doubleStep(FORWARD, 25, SINGLE);
   
   digitalWrite(BACK_MAGNET, LOW);
   motor1.setSpeed(250);
@@ -188,49 +192,70 @@ void navigateOverWall(){
 }
 
 void findAndOrientDropSite (){
+  //assumes sensors are at position 0 and 1, should be modified if otherwise
   //check for change in sensor distance
-  int distanceToSite = 0;
+  int distanceToSite[] = {0, 0};
   int newDistance = 0;
   int newDistanceCounter = 0;
-  int sensorDistance = 0;
+  int sensorDistance[2] = {0, 0};
 
   int holdCounter = 0;
 
   bool isFacingSite = false;
   bool foundSite = false;
+  int foundSiteSide = -1;
 
   delay(5000);
+
+  //inititalize distances for both sensors
+
+  for (int i = LEFT_SIDE; i < RIGHT_SIDE + 1; i++){
+    while (distanceToSite[i] == 0){
+      distanceToSite[i] = sonar[i].ping_cm(); //might need to step forward here
+    }
+  }
 
   //detect dropsite
   while(!isFacingSite){
     if (!foundSite){
       doubleStep(10, FORWARD, SINGLE);
-      sensorDistance = sonar[0].ping_cm();
-      if (distanceToSite == 0){
-        while (sonar[0].ping_cm() == 0){};
-        distanceToSite = sonar[0].ping_cm();
-      } else if (!distanceWithinTolerances (distanceToSite, sensorDistance, 10, 20)){
-          doubleStep(25, FORWARD, SINGLE);
-          while  (holdCounter < 5){
-            delay(100);
-            holdCounter++;
-            
-            if (distanceWithinTolerances (sonar[0].ping_cm(), sensorDistance, 10, 20)){
-              newDistanceCounter ++;
+      for (int i = LEFT_SIDE; i < RIGHT_SIDE + 1; i++){
+        sensorDistance[i] = sonar[i].ping_cm();
+        if (!distanceWithinTolerances (distanceToSite[i], sensorDistance[i], 0, 20)){
+            doubleStep(25, FORWARD, SINGLE); //moves forward for each side check, but should be fine
+            while  (holdCounter < 5){
+              delay(100);
+              holdCounter++;
+              
+              if (distanceWithinTolerances (sonar[i].ping_cm(), sensorDistance[i], 10, 20)){
+                newDistanceCounter ++;
+              }
             }
-          }
-          if (newDistanceCounter > 4){
-            foundSite = true;
-            sensorDistance = distanceToSite;
-          }
-          else {
-            newDistanceCounter = 0;
-            distanceToSite = sensorDistance;
-        }   
+            if (newDistanceCounter > 4){
+              foundSite = true;
+              distanceToSite[i] = sensorDistance[i];
+
+              if (i == LEFT_SIDE){
+                foundSiteSide = LEFT_SIDE;
+              } else {
+                foundSiteSide = RIGHT_SIDE;
+              }
+              break;
+           }
+           else {
+              newDistanceCounter = 0;
+              holdCounter = 0;
+              distanceToSite[i] = sensorDistance[i];
+          }   
+        }
       }
     } else {
-      turnLeft (25, SINGLE);
-      if (distanceWithinTolerances (distanceToSite, sonar[1].ping_cm(), 0, 10)) {
+      if ( foundSiteSide == LEFT_SIDE){
+        turnLeft (25, SINGLE);
+      } else if (foundSiteSide == RIGHT_SIDE){
+        turnRight (25, SINGLE);
+      }
+      if (distanceWithinTolerances (distanceToSite[foundSiteSide], sonar[FRONT_SIDE].ping_cm(), 0, 20)) {
         isFacingSite = true;
       } 
     }
@@ -247,7 +272,7 @@ void loop() {
 
 
   findAndOrientWall();
-  navigateOverWall()
+  navigateOverWall();
   delay(20000);
 
 
